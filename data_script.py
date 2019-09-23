@@ -5,6 +5,8 @@ from xlsxwriter.utility import xl_rowcol_to_cell
 
 import os
 
+from scipy import stats
+
 # Assume only data text files in Raw Data/
 files = os.scandir('Raw Data/')
 
@@ -20,8 +22,10 @@ for check in checkSameSampleID:
         sys.exit('Files have different Sample IDs. Please check Raw Data.')
 
 # Create workbook, the excel file
-workbook = xlsxwriter.Workbook(workbookName + '.xlsx')
+workbook = xlsxwriter.Workbook('Processed Data/' + workbookName + '.xlsx')
 files = os.scandir('Raw Data/')
+idvdWorksheets = []
+curWS = 0
 
 # Create each worksheet from files
 for file in files:
@@ -85,15 +89,20 @@ for file in files:
 
     row = 1
     line = curFile.readline()
+    y_fwd = [] # for calculating trend line manually later
+    y_rvs = []
     while line:
         nextIndex = 0;
         for i in range(3):
             worksheet.write(row, col + i, float(line[nextIndex : line.find('\t', nextIndex)]))
-
+            if i == 1:
+                if (row >= 263 and row <= 303) or (row >= 465 and row <= 505) or (row >= 667 and row <= 707) or (row >= 869 and row <= 909) or (row >= 1071 and row <= 1111):
+                    y_fwd.append(float(line[nextIndex : line.find('\t', nextIndex)]))
+                elif (row >=  304 and row <= 344) or (row >= 506 and row <= 546) or (row >= 708 and row <= 748) or (row >= 910 and row <= 950) or (row >= 1112 and row <= 1152):
+                    y_rvs.append(float(line[nextIndex : line.find('\t', nextIndex)]))
             nextIndex = line.find('\t', nextIndex) + 1
         row += 1
         line = curFile.readline()
-
     curFile.close()
 
     # Useful variables
@@ -122,6 +131,7 @@ for file in files:
 
     # Plot abs values
     col += 1
+    startIDVD = col
     absChart = workbook.add_chart({'type': 'scatter'})
     absChart.set_size({'width': 500,
                        'height': 480,
@@ -352,10 +362,10 @@ for file in files:
                                      'line': {'dash_type': 'round_dot'},
                                      'min': priStop,
                                      'marker': {'type': 'circle'},
-                                     # 'trendline': {'type': 'linear',
-                                     #               'display_equation': True,
-                                     #               'name': 'Linear (' + str(secStart + secSteps * i) + ' V)',
-                                     #               },
+                                     'trendline': {'type': 'linear',
+                                                   'display_equation': True,
+                                                   'name': 'L' + str(secStart + secSteps * i),
+                                                   },
                                      })
         worksheet.insert_chart(xl_rowcol_to_cell(1, col), trendFwdChart)
 
@@ -397,12 +407,42 @@ for file in files:
                                      'line': {'dash_type': 'round_dot'},
                                      'min': priStop,
                                      'marker': {'type': 'circle'},
-                                     # 'trendline': {'type': 'linear',
-                                     #               'display_equation': True,
-                                     #               'name': 'Linear (' + str(secStart + secSteps * i) + ' V)',
-                                     #               },
+                                     'trendline': {'type': 'linear',
+                                                   'display_equation': True,
+                                                   'name': 'L' + str(secStart + secSteps * i) ,
+                                                   },
                                      })
         worksheet.insert_chart(xl_rowcol_to_cell(26, col), trendRvsChart)
+
+        # init variables for calc x-intercept
+        xFwd = []
+        for i in range(41):
+            xFwd.append(-60 - i)
+        xRvs = []
+        for i in range(41):
+            xRvs.append(-100 + i)
+        mFwd = []
+        bFwd = []
+        mRvs = []
+        bRvs = []
+        xInterFwd = []
+        xInterRvs = []
+
+        # Calc FWD lin trend line for x-intercept
+        for num in range(5):
+            curFwdY = [None] * 41
+            curRvsY = [None] * 41
+            for i in range(41):
+                curFwdY[i] = pow(abs(y_fwd[num * 41 + i]), 0.5)
+                curRvsY[i] = pow(abs(y_rvs[num * 41 + i]), 0.5)
+            slopeFwd, interceptFwd, r_valueFwd, p_valueFwd, std_errFwd = stats.linregress(xFwd, curFwdY)
+            slopeRvs, interceptRvs, r_valueRvs, p_valueRvs, std_errRvs = stats.linregress(xRvs, curRvsY)
+            mFwd.append(slopeFwd)
+            bFwd.append(interceptFwd * -1)
+            mRvs.append(slopeRvs)
+            bRvs.append(interceptRvs * -1)
+            xInterFwd.append(interceptFwd * -1 / slopeFwd)
+            xInterRvs.append(interceptRvs * -1 / slopeRvs)
 
         # Create intercept chart
         col += 9
@@ -410,20 +450,31 @@ for file in files:
             worksheet.write(i, col, 'Vd ' + str(secStart + secSteps * i))
         col += 1
         worksheet.write(0, col, 'm FWD')
+        for i in range(5):
+            worksheet.write(i + 1, col, mFwd[i])
         col += 1
         worksheet.write(0, col, 'b FWD')
+        for i in range(5):
+            worksheet.write(i + 1, col, bFwd[i])
         col += 1
+        fVth = col
         worksheet.write(0, col, 'VTH FWD')
         for i in range(1, secCount):
-            worksheet.write_formula(i, col, '=' + xl_rowcol_to_cell(i, col - 1) + "/" + xl_rowcol_to_cell(i, col - 2))
+            worksheet.write(i, col, xInterFwd[i - 1])
         col += 1
         worksheet.write(0, col, 'm RVS')
+        for i in range(5):
+            worksheet.write(i + 1, col, mRvs[i])
         col += 1
         worksheet.write(0, col, 'b RVS')
+        for i in range(5):
+            worksheet.write(i + 1, col, bRvs[i])
         col += 1
+        rVth = col
+        midpoint = [] # Calculate the cutoff
         worksheet.write(0, col, 'VTH RVS')
         for i in range(1, secCount):
-            worksheet.write_formula(i, col, '=' + xl_rowcol_to_cell(i, col - 1) + "/" + xl_rowcol_to_cell(i, col - 2))
+            worksheet.write(i, col, xInterRvs[i - 1])
 
         # dId/dVg
         col += 2
@@ -447,6 +498,7 @@ for file in files:
         col += 1
         worksheet.write(0, col, "Linear Mobility")
         col += 1
+        linMob = col
         for i in range(1, secCount):
             worksheet.write(0, col, "lmob " + str(secStart + secSteps * i))
             for j in range(1, endRow - 1):
@@ -457,45 +509,118 @@ for file in files:
         col += 1
         worksheet.write(0, col, "Sat Mobility")
         col += 1
+        satMob = col
         for i in range(1, secCount):
             worksheet.write(0, col, "smob " + str(secStart + secSteps * i))
             for j in range(1, endRow - 1):
                 worksheet.write_formula(j, col, '=(2*(' + xl_rowcol_to_cell(j, dSQIdStart + i - 1) + ')^2)/(' + str(wlRatio * cap) + ')')
             col += 1
-    else:
-        # Mob Factor
+
+        # Combined mobilities chart: 0-Vth is sat and Vth + 1 - -100 is lin
         col += 1
-        worksheet.write(0, col, "Mob Factor")
+        worksheet.write(0, col, "Combo Mobility")
+        col+= 1
+        combMob = col
+        for i in range(1, secCount):
+            worksheet.write(0, col, "mob " + str(secStart + secSteps * i))
+            curDivPoint = int(round(xInterRvs[i - 1])) + secStart + secSteps * i
+            for j in range(1, abs(curDivPoint) + 2):
+                if(j <= 99):
+                    worksheet.write_formula(j, col, '=' + xl_rowcol_to_cell(j, satMob + i - 1))
+            if curDivPoint < 0:
+                for j in range(abs(curDivPoint) + 2, 100):
+                    worksheet.write_formula(j, col, '=' + xl_rowcol_to_cell(j, linMob + i - 1))
+            col += 1
+
+        # Mobility graph
+        col += 1
+        mobChart = workbook.add_chart({'type': 'scatter'})
+        mobChart.set_size({'width': 680,
+                               'height': 480,
+                               })
+        mobChart.set_plotarea({'layout': {'x': 0.17,
+                                              'y': 0.1,
+                                              'width': 0.63,
+                                              'height': 0.73
+                                              }
+                                   })
+        mobChart.set_legend({'font': {'bold': 1, 'size': 14}})
+        mobChart.set_title({'name': workbookName + ' ' + worksheetName + ' MOBILITY'})
+        mobChart.set_y_axis({'name': 'Mobility (cm^2/Vs)',
+                                 'label_position': 'high',
+                                 'num_format': '#.#',
+                                 'num_font': {'bold': 1},
+                                 'name_font': {'size': 14},
+                                 'name_layout': {'x': 0, 'y': 0.4},
+                                 })
+
+        mobChart.set_x_axis({'name': 'VGATE (V)',
+                                 'reverse': True,
+                                 'major_gridlines': {'visible': True},
+                                 'min': priStop,
+                                 'max': 0,
+                                 'name_font': {'size': 14},
+                                 'num_font': {'bold': 1},
+                                 'label_position': 'low',
+                                })
+        for i in range(1, secCount):
+            curDivPoint = abs(int(round(xInterRvs[i - 1])) + secStart + secSteps * i)
+            mobChart.add_series({'values': [worksheetName, 1, combMob + i - 1, curDivPoint + 2, combMob + i - 1],
+                                     'categories': [worksheetName, 1, 0, curDivPoint + 2, 0],
+                                     'name': 'Sat' + str(secStart + secSteps * i) + ' V',
+                                     'name_font': {'bold': 1},
+                                     'line': {'dash_type': 'round_dot'},
+                                     'min': priStop,
+                                     'marker': {'type': 'circle'},
+                                     })
+            mobChart.add_series({'values': [worksheetName, curDivPoint + 2, combMob + i - 1, 99, combMob + i - 1],
+                                     'categories': [worksheetName, curDivPoint + 2, 0, 99, 0],
+                                     'name': 'Lin' + str(secStart + secSteps * i) + ' V',
+                                     'name_font': {'bold': 1},
+                                     'line': {'dash_type': 'solid'},
+                                     'min': priStop,
+                                     'marker': {'type': 'square'},
+                                     })
+        worksheet.insert_chart(xl_rowcol_to_cell(1, col), mobChart)
+
+        # Do IDVD stuff with reverse Vth -100
+
+        # Mob Factor
+        col = startIDVD
+        col += 9
+        idvdWorksheets[curWS].write(0, col, "Mob Factor")
         col += 1
         factorStart = col
         for i in range(1, secCount):
-            worksheet.write(0, col, "F " + str(secStart + secSteps * i))
+            idvdWorksheets[curWS].write(0, col, "F " + str(secStart + secSteps * i))
             for j in range(1, endRow - 2):
-                # TODO: Add the CN Vth stuff
-                worksheet.write(j, col, "FILLER")
-                # worksheet.write_formula(j, col, '=1/((' + str(secStart + secSteps * i) + '*A' + str(j + 1) + ')-(\'' + 'S' + sampleNum + ' D' + deviceNum + ' ' + str(temperature) + 'K ' + str(length) + 'L ' + 'IDVG\'!$')
+                idvdWorksheets[curWS].write(j, col, "FILLER")
+                idvdWorksheets[curWS].write_formula(j, col, '=1/((' + str(secStart + secSteps * i) + '*A' + str(j + 1) + ')-(' + str(xInterRvs[4]) + '*A' + str(j + 1) + ')-((A' + str(j + 1) + ')^2/2))')
             col += 1
 
-        # # Linear Mobility
-        # col += 1
-        # worksheet.write(0, col, "Linear Mobility")
-        # col += 1
-        # for i in range(1, secCount):
-        #     worksheet.write(0, col, "lmob " + str(secStart + secSteps * i))
-        #     for j in range(1, endRow - 2):
-        #         worksheet.write_formula(j, col, '=(' + xl_rowcol_to_cell(j, absStart + i - 1) + '*' + xl_rowcol_to_cell(j, factorStart + i - 1) + ')/(' + str(wlRatio * cap) + ')')
-        #     col += 1
-        #
-        # # Sat Mobility
-        # col += 1
-        # worksheet.write(0, col, "Sat Mobility")
-        # col += 1
-        # for i in range(1, secCount):
-        #     worksheet.write(0, col, "smob " + str(secStart + secSteps * i))
-        #     for j in range(1, endRow - 2):
-                # TODO: Finish after doing chart, BB26
-        #         worksheet.write_formula(j, col, '=((2*' + xl_rowcol_to_cell(j, absStart + i - 1) + ')/((' + str(wlRatio * cap) + ')*(' + str(secStart + secSteps * i) + '-' + '))')
-        #     col += 1
+        # Linear Mobility
+        col += 1
+        idvdWorksheets[curWS].write(0, col, "Linear Mobility")
+        col += 1
+        for i in range(1, secCount):
+            idvdWorksheets[curWS].write(0, col, "lmob " + str(secStart + secSteps * i))
+            for j in range(1, endRow - 2):
+                idvdWorksheets[curWS].write_formula(j, col, '=(' + xl_rowcol_to_cell(j, absStart + i) + '*' + xl_rowcol_to_cell(j, factorStart + i - 1) + ')/(' + str(wlRatio * cap) + ')')
+            col += 1
 
+        # Sat Mobility
+        col += 1
+        idvdWorksheets[curWS].write(0, col, "Sat Mobility")
+        col += 1
+        for i in range(1, secCount):
+            idvdWorksheets[curWS].write(0, col, "smob " + str(secStart + secSteps * i))
+            for j in range(1, endRow - 2):
+                idvdWorksheets[curWS].write_formula(j, col, '=((2*' + xl_rowcol_to_cell(j, absStart + i) + ')/((' + str(wlRatio * cap) + ')*(' + str(secStart + secSteps * i) + '-' + str(xInterRvs[4]) +')^2))')
+            col += 1
+
+        curWS += 1
+
+    else:
+        idvdWorksheets.append(worksheet)
 
 workbook.close()
