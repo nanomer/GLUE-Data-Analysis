@@ -602,6 +602,7 @@ for file in files:
         col += 1
         idvdWorksheets[curWS].write(0, col, "Linear Mobility")
         col += 1
+        linMob = col
         for i in range(1, secCount):
             idvdWorksheets[curWS].write(0, col, "lmob " + str(secStart + secSteps * i))
             for j in range(1, endRow - 2):
@@ -612,11 +613,87 @@ for file in files:
         col += 1
         idvdWorksheets[curWS].write(0, col, "Sat Mobility")
         col += 1
+        satMob = col
         for i in range(1, secCount):
             idvdWorksheets[curWS].write(0, col, "smob " + str(secStart + secSteps * i))
             for j in range(1, endRow - 2):
                 idvdWorksheets[curWS].write_formula(j, col, '=((2*' + xl_rowcol_to_cell(j, absStart + i) + ')/((' + str(wlRatio * cap) + ')*(' + str(secStart + secSteps * i) + '-' + str(xInterRvs[4]) +')^2))')
             col += 1
+
+        # Combined mobilities chart: 0-Vth is sat and Vth + 1 - -100 is lin
+        col += 1
+        idvdWorksheets[curWS].write(0, col, "Combo Mobility")
+        col += 1
+        combMob = col
+        for i in range(1, secCount):
+            idvdWorksheets[curWS].write(0, col, "mob " + str(secStart + secSteps * i))
+            curDivPoint = int(round(secStart + secSteps * i - xInterRvs[4]))
+            if curDivPoint < 0:
+                for j in range(1, abs(curDivPoint) + 2):
+                    idvdWorksheets[curWS].write_formula(j, col, '=' + xl_rowcol_to_cell(j, linMob + i - 1))
+                curDivPoint = abs(curDivPoint)
+            else:
+                curDivPoint = -1
+            for j in range(curDivPoint + 2, 100):
+                idvdWorksheets[curWS].write_formula(j, col, '=' + xl_rowcol_to_cell(j, satMob + i - 1))
+            col += 1
+
+        # Mobility graph
+        col += 1
+        mobChart = workbook.add_chart({'type': 'scatter'})
+        mobChart.set_size({'width': 680,
+                           'height': 480,
+                           })
+        mobChart.set_plotarea({'layout': {'x': 0.17,
+                                          'y': 0.1,
+                                          'width': 0.63,
+                                          'height': 0.73
+                                          }
+                               })
+        mobChart.set_legend({'font': {'bold': 1, 'size': 14}})
+        mobChart.set_title({'name': workbookName + ' ' + idvdWorksheets[curWS].get_name() + ' MOBILITY'})
+        mobChart.set_y_axis({'name': 'Mobility (cm^2/Vs)',
+                             'label_position': 'high',
+                             'num_format': '#.#',
+                             'num_font': {'bold': 1},
+                             'name_font': {'size': 14},
+                             'name_layout': {'x': 0, 'y': 0.4},
+                             'max': 20
+                             })
+
+        mobChart.set_x_axis({'name': 'VGATE (V)',
+                             'reverse': True,
+                             'major_gridlines': {'visible': True},
+                             'min': priStop,
+                             'max': 0,
+                             'name_font': {'size': 14},
+                             'num_font': {'bold': 1},
+                             'label_position': 'low',
+                             })
+        for i in range(1, secCount):
+            curDivPoint = int(round(secStart + secSteps * i - xInterRvs[4]))
+            if curDivPoint < 0:
+                mobChart.add_series({'values': [idvdWorksheets[curWS].get_name(), 1, combMob + i - 1, abs(curDivPoint) + 2, combMob + i - 1],
+                                     'categories': [idvdWorksheets[curWS].get_name(), 1, 0, abs(curDivPoint) + 2, 0],
+                                     'name': 'Lin' + str(secStart + secSteps * i) + ' V',
+                                     'name_font': {'bold': 1},
+                                     'line': {'dash_type': 'round_dot'},
+                                     'min': priStop,
+                                     'marker': {'type': 'circle'},
+                                     })
+                curDivPoint = abs(curDivPoint)
+            else:
+                curDivPoint = -1
+            mobChart.add_series({'values': [idvdWorksheets[curWS].get_name(), curDivPoint + 2, combMob + i - 1, 99,
+                                            combMob + i - 1],
+                                 'categories': [idvdWorksheets[curWS].get_name(), curDivPoint + 2, 0, 99, 0],
+                                 'name': 'Sat' + str(secStart + secSteps * i) + ' V',
+                                 'name_font': {'bold': 1},
+                                 'line': {'dash_type': 'solid'},
+                                 'min': priStop,
+                                 'marker': {'type': 'square'},
+                                 })
+        idvdWorksheets[curWS].insert_chart(xl_rowcol_to_cell(1, col), mobChart)
 
         curWS += 1
 
