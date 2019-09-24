@@ -230,7 +230,6 @@ for file in files:
                               })
     worksheet.insert_chart(xl_rowcol_to_cell(26, col), absLogChart)
 
-    # Sqrt stuff only for Vg
     if primary == 'Vg':
         # Sq root abs values
         col += 9
@@ -428,7 +427,6 @@ for file in files:
         xInterFwd = []
         xInterRvs = []
 
-        # Calc FWD lin trend line for x-intercept
         for num in range(5):
             curFwdY = [None] * 41
             curRvsY = [None] * 41
@@ -471,7 +469,6 @@ for file in files:
             worksheet.write(i + 1, col, bRvs[i])
         col += 1
         rVth = col
-        midpoint = [] # Calculate the cutoff
         worksheet.write(0, col, 'VTH RVS')
         for i in range(1, secCount):
             worksheet.write(i, col, xInterRvs[i - 1])
@@ -594,7 +591,6 @@ for file in files:
         for i in range(1, secCount):
             idvdWorksheets[curWS].write(0, col, "F " + str(secStart + secSteps * i))
             for j in range(1, endRow - 2):
-                idvdWorksheets[curWS].write(j, col, "FILLER")
                 idvdWorksheets[curWS].write_formula(j, col, '=1/((' + str(secStart + secSteps * i) + '*A' + str(j + 1) + ')-(' + str(xInterRvs[4]) + '*A' + str(j + 1) + ')-((A' + str(j + 1) + ')^2/2))')
             col += 1
 
@@ -620,7 +616,7 @@ for file in files:
                 idvdWorksheets[curWS].write_formula(j, col, '=((2*' + xl_rowcol_to_cell(j, absStart + i) + ')/((' + str(wlRatio * cap) + ')*(' + str(secStart + secSteps * i) + '-' + str(xInterRvs[4]) +')^2))')
             col += 1
 
-        # Combined mobilities chart: 0-Vth is sat and Vth + 1 - -100 is lin
+        # Combined mobilities chart
         col += 1
         idvdWorksheets[curWS].write(0, col, "Combo Mobility")
         col += 1
