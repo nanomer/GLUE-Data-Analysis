@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 import xlsxwriter
 from xlsxwriter.utility import xl_rowcol_to_cell
@@ -5,10 +7,10 @@ import os
 from scipy import stats
 
 # ASSUMPTIONS:
-# 1. Goes from 0 -> -100 by -1
-# 2. Always want -60 -> -100 for linear regression
-# 3. Everything is named correctly
-# 4. For every IDVG there is a corresponding IDVD file
+# 1. Step size of x-axis is 1 or -1
+# 2. Everything is named correctly
+# 3. For every IDVG there is a corresponding IDVD file
+# 4. Set def y max for IDVD combo mob graph to 20, change in excel for every one
 
 # GLOBAL VARIABLES
 idvdWorksheets = []
@@ -74,7 +76,7 @@ def process_file(workbook, file):
     line = curFile.readline()
     priStop = int(line[line.find('\t') + 1: line.find('\n')])
     line = curFile.readline()
-    priSteps = int(line[line.find('\t') + 1: line.find('\n')])
+    priSteps = int(line[line.find('\t') + 1: line.find('\n')]) # Should be -1 or 1
 
     # Find the secondary information
     line = curFile.readline()
@@ -129,6 +131,15 @@ def process_file(workbook, file):
     endRow = (abs(priStop) - priStart + 1) * 2  # num of rows
     wlRatio = width / length
     baseSecInterval = secSteps + secStart
+    maxX = priStop
+    midX = (priStart + priStop) // 2 + (priStop // 10) # Should be 60, not really mid
+    minX = priStart
+    reverse = False
+    if priSteps < 0:
+        maxX = priStart
+        midX = (priStart + priStop) // 2 - (priStop // 10) # Should be -60, not really mid
+        minX = priStop
+        reverse = True
 
     #Graph dict, starts w/ values for first graph (abs) and will change for others
     title = {'name': workbookName + ' ' + worksheetName}
@@ -140,10 +151,10 @@ def process_file(workbook, file):
              'name_layout': {'x': 0.03, 'y': 0.3},
              }
     xAxis = {'name': 'VDRAIN (V)',
-             'reverse': True,
+             'reverse': reverse,
              'major_gridlines': {'visible': True},
-             'min': priStop,
-             'max': 0,
+             'min': minX,
+             'max': maxX,
              'name_font': {'size': 14},
              'num_font': {'bold': 1},
              'label_position': 'low',
@@ -183,7 +194,7 @@ def process_file(workbook, file):
                               'name_font': {'bold': 1},
                               'line': {'dash_type': 'round_dot'},
                               'marker': {'type': 'circle'},
-                              'min': priStop,
+                              'min': minX,
                               })
     worksheet.insert_chart(xl_rowcol_to_cell(1, col), absChart)
 
@@ -200,7 +211,7 @@ def process_file(workbook, file):
                               'name_font': {'bold': 1},
                               'line': {'dash_type': 'round_dot'},
                               'marker': {'type': 'circle'},
-                              'min': priStop,
+                              'min': minX,
                               })
     worksheet.insert_chart(xl_rowcol_to_cell(26, col), absLogChart)
 
@@ -230,7 +241,7 @@ def process_file(workbook, file):
                                      'name_font': {'bold': 1},
                                      'line': {'dash_type': 'round_dot'},
                                      'marker': {'type': 'circle'},
-                                     'min': priStop,
+                                     'min': minX,
                                      })
         worksheet.insert_chart(xl_rowcol_to_cell(1, col), sqrtFwdChart)
 
@@ -245,7 +256,7 @@ def process_file(workbook, file):
                                      'name_font': {'bold': 1},
                                      'line': {'dash_type': 'round_dot'},
                                      'marker': {'type': 'circle'},
-                                     'min': priStop,
+                                     'min': minX,
                                      })
         worksheet.insert_chart(xl_rowcol_to_cell(26, col), sqrtRvsChart)
 
@@ -253,7 +264,7 @@ def process_file(workbook, file):
         col += skipGraph
         trendFwdChart = workbook.add_chart({'type': 'scatter'})
         title['name'] = workbookName + ' ' + worksheetName + ' FWD VTH'
-        xAxis['max'] = priStop + 40
+        xAxis['max'] = midX
         graph(worksheetName, trendFwdChart, title, yAxis, xAxis)
         for i in range(1, secCount):
             trendFwdChart.add_series({'values': [worksheetName, endRow // 2 - 40, sqrtStart + i, endRow // 2, sqrtStart + i],
@@ -261,7 +272,7 @@ def process_file(workbook, file):
                                      'name': str(baseSecInterval * i) + ' V',
                                      'name_font': {'bold': 1},
                                      'line': {'dash_type': 'round_dot'},
-                                     'min': priStop,
+                                     'min': minX,
                                      'marker': {'type': 'circle'},
                                      'trendline': {'type': 'linear',
                                                    'display_equation': True,
@@ -280,7 +291,7 @@ def process_file(workbook, file):
                                      'name': str(baseSecInterval * i) + ' V',
                                      'name_font': {'bold': 1},
                                      'line': {'dash_type': 'round_dot'},
-                                     'min': priStop,
+                                     'min': minX,
                                      'marker': {'type': 'circle'},
                                      'trendline': {'type': 'linear',
                                                    'display_equation': True,
@@ -389,7 +400,7 @@ def process_file(workbook, file):
         title['name'] = workbookName + ' ' + worksheetName + ' MOBILITY'
         yAxis['name'] = 'Mobility (cm^2/Vs)'
         yAxis['num_format'] = '#.#'
-        xAxis['max'] = 0
+        xAxis['max'] = maxX
         graph(worksheetName, mobChart, title, yAxis, xAxis)
         for i in range(1, secCount):
             curDivPoint = abs(int(round(xInterRvs[i - 1])) + baseSecInterval * i)
@@ -398,7 +409,7 @@ def process_file(workbook, file):
                                      'name': 'Sat' + str(baseSecInterval * i) + ' V',
                                      'name_font': {'bold': 1},
                                      'line': {'dash_type': 'round_dot'},
-                                     'min': priStop,
+                                     'min': minX,
                                      'marker': {'type': 'circle'},
                                      })
             mobChart.add_series({'values': [worksheetName, curDivPoint + 2, combMob + i - 1, 99, combMob + i - 1],
@@ -406,7 +417,7 @@ def process_file(workbook, file):
                                      'name': 'Lin' + str(baseSecInterval * i) + ' V',
                                      'name_font': {'bold': 1},
                                      'line': {'dash_type': 'solid'},
-                                     'min': priStop,
+                                     'min': minX,
                                      'marker': {'type': 'square'},
                                      })
         worksheet.insert_chart(xl_rowcol_to_cell(1, col), mobChart)
@@ -469,6 +480,8 @@ def process_file(workbook, file):
             col += 1
 
         # Combined mobilities graph
+        # First get upperbound (depending on 60 V bias)
+
         col += 1
         mobChart = workbook.add_chart({'type': 'scatter'})
         title['name'] = workbookName + ' ' + idvdWorksheets[curWS].get_name() + ' MOBILITY'
@@ -482,7 +495,7 @@ def process_file(workbook, file):
                                      'name': 'Lin' + str(baseSecInterval * i) + ' V',
                                      'name_font': {'bold': 1},
                                      'line': {'dash_type': 'round_dot'},
-                                     'min': priStop,
+                                     'min': minX,
                                      'marker': {'type': 'circle'},
                                      })
                 curDivPoint = abs(curDivPoint)
@@ -494,7 +507,7 @@ def process_file(workbook, file):
                                  'name': 'Sat' + str(baseSecInterval * i) + ' V',
                                  'name_font': {'bold': 1},
                                  'line': {'dash_type': 'solid'},
-                                 'min': priStop,
+                                 'min': minX,
                                  'marker': {'type': 'square'},
                                  })
         idvdWorksheets[curWS].insert_chart(xl_rowcol_to_cell(1, col), mobChart)
