@@ -14,6 +14,7 @@ from scipy import stats
 
 # GLOBAL VARIABLES
 idvdWorksheets = []
+listofIDVDy_rvs = []
 curWS = 0
 skipGraph = 11
 workbookName = ''
@@ -47,6 +48,7 @@ def main():
 def process_file(workbook, file):
     global idvdWorksheets
     global curWS
+    global listofIDVDy_rvs
     # Grab the info from the file name to name the worksheet and set constants
     filename = file.name
     startIndex = filename.find('CMM')
@@ -132,12 +134,11 @@ def process_file(workbook, file):
     wlRatio = width / length
     baseSecInterval = secSteps + secStart
     maxX = priStop
-    midX = (priStart + priStop) // 2 + (priStop // 10) # Should be 60, not really mid
+    midX = (priStart + priStop) // 2 + (priStop // 10) # Should be 60/-60, not really mid
     minX = priStart
     reverse = False
     if priSteps < 0:
         maxX = priStart
-        midX = (priStart + priStop) // 2 - (priStop // 10) # Should be -60, not really mid
         minX = priStop
         reverse = True
 
@@ -300,7 +301,7 @@ def process_file(workbook, file):
                                      })
         worksheet.insert_chart(xl_rowcol_to_cell(26, col), trendRvsChart)
 
-        # Calculate trendline values
+        # Calculate trend line values
         mFwd, bFwd, mRvs, bRvs, xInterFwd, xInterRvs = calc_trendline(y_fwd, y_rvs)
 
         # Create intercept chart
@@ -424,6 +425,9 @@ def process_file(workbook, file):
 
         ### Now do IDVD stuff w/ reverse Vth -100 ###
 
+        y_rvs = listofIDVDy_rvs[curWS] # load list corresponding to cur idvd ws
+        y_rvs = y_rvs[0]
+
        # Mob Factor
         col = startIDVD
         col += skipGraph
@@ -480,12 +484,17 @@ def process_file(workbook, file):
             col += 1
 
         # Combined mobilities graph
-        # First get upperbound (depending on 60 V bias)
-
+        # First find max current (upperbound) for 60 V bias
+        max60 = -1.0
+        for i in range(41):
+            check = abs(y_rvs[41 * 2 + i])
+            if(check > max60):
+                max60 = check
+        max60 = int((2 * max60) / ((wlRatio * cap) * pow(midX - xInterRvs[4], 2))) + 1
         col += 1
         mobChart = workbook.add_chart({'type': 'scatter'})
         title['name'] = workbookName + ' ' + idvdWorksheets[curWS].get_name() + ' MOBILITY'
-        yAxis['max'] = 20
+        yAxis['max'] = max60
         graph(worksheetName, mobChart, title, yAxis, xAxis)
         for i in range(1, secCount):
             curDivPoint = int(round(baseSecInterval * i - xInterRvs[4]))
@@ -516,6 +525,7 @@ def process_file(workbook, file):
 
     else:
         idvdWorksheets.append(worksheet)
+        listofIDVDy_rvs.append((list(y_rvs), y_rvs[0]))
 
 def graph(worksheetName, chart, title, yAxis, xAxis):
     global workbookName
