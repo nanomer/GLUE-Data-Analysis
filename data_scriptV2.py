@@ -10,7 +10,6 @@ from scipy import stats
 # 1. Step size of x-axis is 1 or -1
 # 2. Everything is named correctly
 # 3. For every IDVG there is a corresponding IDVD file
-# 4. Set def y max for IDVD combo mob graph to 20, change in excel for every one
 
 # GLOBAL VARIABLES
 idvdWorksheets = []
@@ -387,10 +386,14 @@ def process_file(workbook, file):
         for i in range(1, secCount):
             worksheet.write(0, col, "mob " + str(baseSecInterval * i))
             curDivPoint = int(round(xInterRvs[i - 1])) + baseSecInterval * i
-            for j in range(1, abs(curDivPoint) + 2):
-                if (j <= 99):
-                    worksheet.write_formula(j, col, '=' + xl_rowcol_to_cell(j, satMob + i - 1))
             if curDivPoint < 0:
+                for j in range(1, abs(curDivPoint) + 2):
+                    if j <= 99:
+                        worksheet.write_formula(j, col, '=' + xl_rowcol_to_cell(j, satMob + i - 1))
+            if curDivPoint > 0:
+                for j in range(1, 100):
+                    worksheet.write_formula(j, col, '=' + xl_rowcol_to_cell(j, linMob + i - 1))
+            else:
                 for j in range(abs(curDivPoint) + 2, 100):
                     worksheet.write_formula(j, col, '=' + xl_rowcol_to_cell(j, linMob + i - 1))
             col += 1
@@ -474,12 +477,12 @@ def process_file(workbook, file):
             idvdWorksheets[curWS].write(0, col, "mob " + str(baseSecInterval * i))
             curDivPoint = int(round(baseSecInterval * i - xInterRvs[4]))
             if curDivPoint < 0:
-                for j in range(1, abs(curDivPoint) + 2):
+                for j in range(1, abs(curDivPoint) + 1):
                     idvdWorksheets[curWS].write_formula(j, col, '=' + xl_rowcol_to_cell(j, linMob + i - 1))
                 curDivPoint = abs(curDivPoint)
             else:
                 curDivPoint = -1
-            for j in range(curDivPoint + 2, 100):
+            for j in range(curDivPoint + 1, 100):
                 idvdWorksheets[curWS].write_formula(j, col, '=' + xl_rowcol_to_cell(j, satMob + i - 1))
             col += 1
 
