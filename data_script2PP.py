@@ -10,6 +10,7 @@ from scipy import stats
 # 1. Step size of x-axis is 1 or -1
 # 2. Everything is named correctly
 # 3. For every IDVG there is a corresponding IDVD file
+# 4. Always 0, -20, -40, -60, -80, -100
 
 # GLOBAL VARIABLES
 idvdWorksheets = []
