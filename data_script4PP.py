@@ -370,9 +370,10 @@ def graph(chart, title, yAxis, xAxis):
 
 def calc_trendline(id, v1, v2):
     x = []
-    for i in range(36):
-        x.append(-65 - i)
-    for i in range(-100, -64):
+    length = len(id)
+    for i in range(length // 2):
+        x.append(-(100 - length // 2 + 1) - i)
+    for i in range(-100, -(100 - length // 2)):
         x.append(i)
     mOrig = []
     bOrig = []
@@ -383,7 +384,7 @@ def calc_trendline(id, v1, v2):
 
     curOrigY = []
     curCorrectY = []
-    for i in range(72):
+    for i in range(length):
         curOrigY.append(id[i] / (v2[i] - v1[i]))
         curCorrectY.append(id[i] / (5 * (v2[i] - v1[i])))
     slopeOrig, interceptOrig, r_valueOrig, p_valueOrig, std_errOrig = stats.linregress(x, curOrigY)
