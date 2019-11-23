@@ -482,23 +482,24 @@ def process_file(workbook, file):
                     idvdWorksheets[curWS].write_formula(j, col, '=' + xl_rowcol_to_cell(j, linMob + i - 1))
                 curDivPoint = abs(curDivPoint)
             else:
-                curDivPoint = -1
+                curDivPoint = 0;
             for j in range(curDivPoint + 1, 100):
                 idvdWorksheets[curWS].write_formula(j, col, '=' + xl_rowcol_to_cell(j, satMob + i - 1))
             col += 1
 
         # Combined mobilities graph
         # First find max current (upperbound) for 60 V bias
-        max60 = -1.0
-        for i in range(41):
-            check = abs(y_rvs[41 * 2 + i])
-            if(check > max60):
-                max60 = check
-        max60 = int((2 * max60) / ((wlRatio * cap) * pow(midX - xInterRvs[4], 2))) + 1
+        #max60 = -1.0
+        # for i in range(41):
+        #     check = abs(y_rvs[41 * 2 + i])
+        #     if(check > 50):
+        #         max60 = check
+        # max60 = int((2 * max60) / ((wlRatio * cap) * pow(midX - xInterRvs[4], 2))) + 1
         col += 1
         mobChart = workbook.add_chart({'type': 'scatter'})
         title['name'] = workbookName + ' ' + idvdWorksheets[curWS].get_name() + ' MOBILITY'
-        yAxis['max'] = max60
+        yAxis['max'] = 50
+        xAxis['name'] = 'VDRAIN(V)'
         graph(worksheetName, mobChart, title, yAxis, xAxis)
         for i in range(1, secCount):
             curDivPoint = int(round(baseSecInterval * i - xInterRvs[4]))
